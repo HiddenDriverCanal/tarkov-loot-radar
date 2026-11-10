@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tarkov-loot-radar — EFT Loot ESP &amp; Loot Radar</title>
+<meta name="description" content="EFT Loot ESP — Tarkov loot radar with item ESP, container overlay, and distance readouts for high-value spawns.">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-0: #070a18;
+    --bg-1: #0d1228;
+    --bg-2: #141a3a;
+    --ink: #e8ecff;
+    --muted: #9aa4c8;
+    --accent: #6d8bff;
+    --accent-2: #b06cff;
+    --accent-3: #35e0c8;
+    --border: rgba(140, 160, 255, 0.16);
+    --glass: rgba(20, 26, 58, 0.55);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Segoe UI", "Inter", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, rgba(109, 139, 255, 0.22), transparent 60%),
+      radial-gradient(1000px 600px at 90% 0%, rgba(176, 108, 255, 0.16), transparent 55%),
+      radial-gradient(900px 700px at 50% 110%, rgba(53, 224, 200, 0.10), transparent 60%),
+      linear-gradient(165deg, #070a18 0%, #0d1228 45%, #101735 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .wrap {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- Nav ---------- */
+  .nav-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 14px 0;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 10px 18px;
+    border-radius: 16px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-size: 1.05rem;
+    white-space: nowrap;
+  }
+
+  .brand .mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 0.95rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 18px rgba(109, 139, 255, 0.45);
+  }
+
+  .brand .name {
+    background: linear-gradient(90deg, #dfe6ff, #9fb2ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .nav-links a { transition: color 0.2s ease; }
+  .nav-links a:hover { color: var(--ink); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 11px 20px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    box-shadow: 0 8px 26px rgba(109, 139, 255, 0.38);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(140, 130, 255, 0.5);
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--border);
+    color: var(--ink);
+  }
+
+  .btn-ghost:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(140, 160, 255, 0.35);
+  }
+
+  .nav .btn { padding: 9px 16px; font-size: 0.86rem; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: 76px 0 40px;
+    text-align: center;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #cdd6ff;
+    background: rgba(109, 139, 255, 0.10);
+    border: 1px solid rgba(140, 160, 255, 0.30);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .pill .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-3);
+    box-shadow: 0 0 10px var(--accent-3);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.82); }
+  }
+
+  h1 {
+    margin: 26px auto 0;
+    max-width: 900px;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+    font-weight: 800;
+    background: linear-gradient(100deg, #ffffff 0%, #b9c6ff 40%, #b06cff 75%, #35e0c8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero p.sub {
+    margin: 22px auto 0;
+    max-width: 640px;
+    font-size: clamp(1rem, 2vw, 1.12rem);
+    color: var(--muted);
+  }
+
+  .hero-actions {
+    margin-top: 34px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .hero-actions .btn { padding: 14px 26px; font-size: 0.98rem; }
+
+  .stats {
+    margin-top: 52px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    max-width: 880px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .stat {
+    padding: 18px 14px;
+    border-radius: 14px;
+    background: rgba(20, 26, 58, 0.5);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .stat:hover { transform: translateY(-3px); border-color: rgba(140, 160, 255, 0.35); }
+
+  .stat .val {
+    font-size: 1.18rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #dfe6ff, #9fb2ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .stat .lbl {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  /* ---------- Sections ---------- */
+  section { padding: 70px 0; }
+
+  .sec-head { text-align: center; margin-bottom: 46px; }
+
+  .sec-eyebrow {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .sec-head h2 {
+    margin-top: 10px;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
+    letter-spacing: -0.03em;
+    font-weight: 800;
+  }
+
+  .sec-head p {
+    margin: 14px auto 0;
+    max-width: 560px;
+    color: var(--muted);
+    font-size: 0.98rem;
+  }
+
+  /* ---------- Features ---------- */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .card {
+    position: relative;
+    padding: 28px 24px 26px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(28, 35, 74, 0.65), rgba(16, 21, 46, 0.65));
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+    opacity: 0.9;
+  }
+
+  .card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(140, 160, 255, 0.38);
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(140, 160, 255, 0.12);
+  }
+
+  .card .icon {
+    font-size: 1.7rem;
+    display: inline-grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    background: rgba(109, 139, 255, 0.12);
+    border: 1px solid rgba(140, 160, 255, 0.22);
+    margin-bottom: 18px;
+  }
+
+  .card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+
+  .card p {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  /* ---------- How it works ---------- */
+  .steps {
+    position: relative;
+    max-width: 720px;
+    margin: 0 auto;
+    padding-left: 66px;
+  }
+
+  .steps::before {
+    content: "";
+    position: absolute;
+    left: 23px;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-2) 50%, var(--accent-3));
+    opacity: 0.75;
+  }
+
+  .step {
+    position: relative;
+    padding: 6px 0 40px;
+  }
+
+  .step:last-child { padding-bottom: 0; }
+
+  .step .num {
+    position: absolute;
+    left: -66px;
+    top: 0;
+    width: 49px;
+    height: 49px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: 3px solid #0b1024;
+    box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.35), 0 8px 22px rgba(109, 139, 255, 0.35);
+  }
+
+  .step h3 {
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding-top: 8px;
+    margin-bottom: 6px;
+  }
+
+  .step p {
+    font-size: 0.93rem;
+    color: var(--muted);
+    max-width: 560px;
+  }
+
+  /* ---------- FAQ ---------- */
+  .faq {
+    max-width: 760px;
+    margin: 0 auto;
+    display: grid;
+    gap: 12px;
+  }
+
+  details {
+    border-radius: 14px;
+    background: rgba(20, 26, 58, 0.55);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+
+  details[open] {
+    border-color: rgba(140, 160, 255, 0.38);
+    background: rgba(26, 33, 70, 0.65);
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.98rem;
+    list-style: none;
+    user-select: none;
+    transition: color 0.2s ease;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { color: #c9d3ff; }
+
+  summary .plus {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--accent);
+    border-radius: 8px;
+    background: rgba(109, 139, 255, 0.12);
+    border: 1px solid rgba(140, 160, 255, 0.22);
+    transition: transform 0.28s ease, color 0.2s ease, background 0.2s ease;
+  }
+
+  details[open] summary .plus {
+    transform: rotate(45deg);
+    color: #ff9bb0;
+    background: rgba(255, 120, 150, 0.12);
+    border-color: rgba(255, 140, 165, 0.3);
+  }
+
+  details .answer {
+    padding: 0 20px 20px;
+    font-size: 0.92rem;
+    color: var(--muted);
+    animation: fadeIn 0.25s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- CTA banner ---------- */
+  .cta-banner {
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    padding: 64px 32px;
+    border-radius: 24px;
+    background: linear-gradient(160deg, rgba(38, 46, 96, 0.9), rgba(16, 21, 46, 0.95));
+    border: 1px solid rgba(140, 160, 255, 0.28);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  }
+
+  .cta-banner::before {
+    content: "";
+    position: absolute;
+    top: -220px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 720px;
+    height: 520px;
+    background: radial-gradient(circle, rgba(109, 139, 255, 0.4), rgba(176, 108, 255, 0.18) 45%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-banner > * { position: relative; }
+
+  .cta-banner h2 {
+    font-size: clamp(1.7rem, 4.2vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(100deg, #ffffff, #b9c6ff 60%, #b06cff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .cta-banner p {
+    margin: 16px auto 0;
+    max-width: 520px;
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  .cta-banner .btn { margin-top: 30px; padding: 15px 32px; font-size: 1rem; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    padding: 34px 0 44px;
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 0.86rem;
+    color: var(--muted);
+  }
+
+  .foot .brand { font-size: 0.95rem; }
+
+  .foot a.github {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ink);
+    font-weight: 600;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  }
+
+  .foot a.github:hover {
+    border-color: rgba(140, 160, 255, 0.4);
+    background: rgba(255, 255, 255, 0.07);
+    transform: translateY(-1px);
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 900px) {
+    .features { grid-template-columns: repeat(2, 1fr); }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .nav { padding: 10px 12px; }
+    .nav .btn { padding: 8px 13px; font-size: 0.8rem; }
+    .brand { font-size: 0.95rem; }
+    .hero { padding: 50px 0 26px; }
+    .hero-actions { flex-direction: column; align-items: stretch; }
+    .hero-actions .btn { width: 100%; }
+    .stats { grid-template-columns: 1fr; margin-top: 40px; }
+    .features { grid-template-columns: 1fr; }
+    section { padding: 52px 0; }
+    .steps { padding-left: 58px; }
+    .steps::before { left: 21px; }
+    .step .num { left: -58px; width: 44px; height: 44px; font-size: 0.95rem; }
+    .cta-banner { padding: 48px 22px; border-radius: 18px; }
+    .foot { justify-content: center; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nav-wrap">
+  <div class="wrap">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <span class="mark">🎯</span>
+        <span class="name">tarkov-loot-radar</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <a class="btn btn-primary" href="https://gitscore.cc" target="_blank" rel="noopener">Download</a>
+    </nav>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="wrap">
+      <span class="pill"><span class="dot"></span>EFT Loot ESP · Windows</span>
+      <h1>See Every High-Value Spawn Before You Commit</h1>
+      <p class="sub">
+        tarkov-loot-radar is an EFT Loot ESP overlay that highlights items, containers, and
+        distance readouts in real time — so you can route raids around the loot that actually matters.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://gitscore.cc" target="_blank" rel="noopener">⬇ Download for Windows</a>
+        <a class="btn btn-ghost" href="https://gitscore.cc" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="val">48,200+</span><span class="lbl">Downloads</span></div>
+        <div class="stat"><span class="val">v2.4.1</span><span class="lbl">Latest version</span></div>
+        <div class="stat"><span class="val">Windows 10 / 11</span><span class="lbl">Platform</span></div>
+        <div class="stat"><span class="val">Free &amp; open source</span><span class="lbl">License</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="sec-eyebrow">Features</span>
+        <h2>Built for loot-driven raids</h2>
+        <p>Everything you need to read a map, price a route, and decide when to extract — in one lightweight overlay.</p>
+      </div>
+
+      <div class="features">
+        <article class="card">
+          <span class="icon">📦</span>
+          <h3>Item ESP</h3>
+          <p>Highlights loose loot through walls and terrain with clear labels, so a GPU or LEDX never slips past your route again.</p>
+        </article>
+        <article class="card">
+          <span class="icon">🗄️</span>
+          <h3>Container Overlay</h3>
+          <p>Draws crates, safes, weapon boxes, and jackets with their type, letting you prioritize the containers worth the detour.</p>
+        </article>
+        <article class="card">
+          <span class="icon">📏</span>
+          <h3>Distance Readouts</h3>
+          <p>Live distance in meters for every tracked spawn, so you know if a high-value item is one room away or across the map.</p>
+        </article>
+        <article class="card">
+          <span class="icon">💎</span>
+          <h3>High-Value Filter</h3>
+          <p>Toggle value tiers to hide junk and surface only barter, quest, and flea-market items worth carrying out.</p>
+        </article>
+        <article class="card">
+          <span class="icon">🗺️</span>
+          <h3>All Maps Supported</h3>
+          <p>Customs, Woods, Interchange, Reserve, Lighthouse, Streets, and Labs — with spawn data tuned per map layout.</p>
+        </article>
+        <article class="card">
+          <span class="icon">⚡</span>
+          <h3>Low Overhead</h3>
+          <p>Lightweight render path and lean memory footprint keep frame pacing stable even during heavy firefights.</p>
+        </article>
